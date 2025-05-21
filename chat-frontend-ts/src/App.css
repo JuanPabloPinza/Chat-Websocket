@@ -1,0 +1,85 @@
+/* src/App.css */
+body {
+  font-family: var(--font-family); /* Usa la fuente del tema PrimeReact */
+  background-color: var(--surface-b); /* Color de fondo del tema */
+  color: var(--text-color); /* Color de texto del tema */
+  margin: 0;
+}
+
+.App {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.chat-room-container {
+  background-color: var(--surface-a); /* Un fondo ligeramente diferente para la sala de chat */
+  border-radius: var(--border-radius);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.room-pin-highlight {
+    color: var(--primary-color);
+    font-weight: bold;
+}
+
+.messages-area {
+  border: 1px solid var(--surface-d);
+  border-radius: var(--border-radius);
+  background-color: var(--surface-b);
+}
+
+.message-bubble {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  max-width: 75%;
+  word-wrap: break-word;
+}
+
+.message-system {
+  font-style: italic;
+  color: var(--text-color-secondary);
+  text-align: center;
+  background-color: var(--surface-c);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.message-user {
+  background-color: var(--surface-d); /* Mensajes de otros */
+  align-self: flex-start;
+  margin-right: auto; /* Alinea a la izquierda */
+}
+
+.message-own {
+  background-color: var(--primary-color); /* Tus mensajes */
+  color: var(--primary-color-text);
+  align-self: flex-end;
+  margin-left: auto; /* Alinea a la derecha */
+}
+
+.message-bubble .timestamp {
+  font-size: 0.75em;
+  display: block;
+  margin-top: 4px;
+  color: var(--text-color-secondary); /* Ajusta si es necesario para el fondo own */
+}
+.message-own .timestamp {
+    color: var(--surface-b); /* Un color más claro para el timestamp en tus mensajes */
+}
+
+.user-list-card .p-card-content {
+    padding: 0.5rem !important; /* Ajustar padding si es necesario */
+}
+.user-list-item {
+    border-bottom: 1px solid var(--surface-d);
+}
+.user-list-item:last-child {
+    border-bottom: none;
+}
+
+/* Asegurar que el contenedor de mensajes use flex para alinear burbujas */
+.messages-area .p-scrollpanel-content {
+    display: flex;
+    flex-direction: column;
+}
