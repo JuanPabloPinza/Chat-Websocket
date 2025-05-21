@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Socket, io } from 'socket.io-client';
 import { v4 as uuidv4 } from 'uuid';
@@ -8,7 +7,7 @@ import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { InputNumber, InputNumberValueChangeEvent } from 'primereact/inputnumber';
 import { Card } from 'primereact/card';
-import { Toast } from 'primereact/toast'; // No se importa ToastMessage directamente usualmente
+import { Toast } from 'primereact/toast';
 import { ScrollPanel } from 'primereact/scrollpanel';
 import { Message } from 'primereact/message';
 
@@ -18,73 +17,75 @@ import './App.css';
 const URL_SERVIDOR_SOCKET = process.env.REACT_APP_SOCKET_SERVER_URL || 'http://localhost:3001';
 
 // --- Interfaces para Tipado ---
-interface MensajeChat { // Anteriormente ChatMessage
-  user: string; // 'usuario' podría ser, pero 'user' es muy estándar
-  text: string; // 'texto'
-  timestamp?: string; // 'marcaDeTiempo'
-  type?: 'system' | 'user' | 'own'; // 'tipo': 'sistema', 'usuario', 'propio'
+interface MensajeChat {
+  user: string;
+  text: string;
+  timestamp?: string;
+  type?: 'system' | 'user' | 'own';
 }
 
-interface DetallesSala { // Anteriormente RoomDetails
-  pin: string;
-  limit: number; // 'limite'
-  participantsCount: number; // 'contadorParticipantes'
-  users: string[]; // 'usuarios'
-}
-
-// Payloads de eventos (opcional pero bueno para la claridad)
-interface PayloadEntradaSala { // Anteriormente JoinedRoomPayload
+interface DetallesSala {
   pin: string;
   limit: number;
   participantsCount: number;
-  isCreator: boolean; // 'esCreador'
+  users: string[];
 }
-interface PayloadActualizacionSala { // Anteriormente RoomUpdatePayload
+
+interface PayloadEntradaSala {
+  pin: string;
+  limit: number;
+  participantsCount: number;
+  isCreator: boolean;
+}
+interface PayloadActualizacionSala {
   participantsCount: number;
   users: string[];
 }
-interface PayloadNuevoMensaje { // Anteriormente NewMessagePayload
+interface PayloadNuevoMensaje {
   user: string;
   text: string;
   timestamp: string;
 }
-interface PayloadError { // Anteriormente ErrorPayload
-  message: string; // 'mensaje'
+interface PayloadError {
+  message: string;
 }
-interface PayloadFeedbackSalidaSala { // Anteriormente LeftRoomFeedbackPayload
+interface PayloadFeedbackSalidaSala {
   message: string;
 }
 
 function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [idDispositivo, setIdDispositivo] = useState<string>(''); // Anteriormente deviceId
+  const [idDispositivo, setIdDispositivo] = useState<string>('');
 
-  const [pinSala, setPinSala] = useState<string>(''); // Anteriormente roomPIN
-  const [pinEntrada, setPinEntrada] = useState<string>(''); // Anteriormente inputPIN
-  const [limiteSalaEntrada, setLimiteSalaEntrada] = useState<number>(5); // Anteriormente roomLimitInput
+  const [pinSala, setPinSala] = useState<string>('');
+  const [pinEntrada, setPinEntrada] = useState<string>('');
+  const [limiteSalaEntrada, setLimiteSalaEntrada] = useState<number>(5);
 
-  const [enSala, setEnSala] = useState<boolean>(false); // Anteriormente inRoom
-  const [mensajes, setMensajes] = useState<MensajeChat[]>([]); // Anteriormente messages
-  const [entradaNuevoMensaje, setEntradaNuevoMensaje] = useState<string>(''); // Anteriormente newMessageInput
-  const [detallesSalaActual, setDetallesSalaActual] = useState<DetallesSala | null>(null); // Anteriormente currentRoomDetails
+  const [enSala, setEnSala] = useState<boolean>(false);
+  const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
+  const [entradaNuevoMensaje, setEntradaNuevoMensaje] = useState<string>('');
+  const [detallesSalaActual, setDetallesSalaActual] = useState<DetallesSala | null>(null);
 
-  const refToast = useRef<Toast>(null); // Anteriormente toastRef
-  const refFinMensajes = useRef<HTMLDivElement | null>(null); // Anteriormente messagesEndRef
-  const [errorEnLinea, setErrorEnLinea] = useState<string | null>(null); // Anteriormente inlineError
+  const refToast = useRef<Toast>(null);
+  const refFinMensajes = useRef<HTMLDivElement | null>(null);
+  const [errorEnLinea, setErrorEnLinea] = useState<string | null>(null);
 
-
-  // Efecto para inicializar ID de Dispositivo y Socket
+  // Efecto para inicializar ID de Dispositivo
   useEffect(() => {
-    let idDispositivoAlmacenado = localStorage.getItem('deviceId'); // Mantenemos 'deviceId' como clave en localStorage por consistencia si otras apps lo usan
+    let idDispositivoAlmacenado = localStorage.getItem('deviceId');
     if (!idDispositivoAlmacenado) {
       idDispositivoAlmacenado = uuidv4();
       localStorage.setItem('deviceId', idDispositivoAlmacenado);
     }
+    console.log('ID de Dispositivo establecido:', idDispositivoAlmacenado);
     setIdDispositivo(idDispositivoAlmacenado);
+  }, []);
 
-    const nuevoSocket = io(URL_SERVIDOR_SOCKET, {
-      // Opciones adicionales si son necesarias
-    });
+  // Efecto para inicializar Socket y eventos
+  useEffect(() => {
+    if (!idDispositivo) return; // Espera a que idDispositivo esté listo
+
+    const nuevoSocket = io(URL_SERVIDOR_SOCKET, {});
     setSocket(nuevoSocket);
 
     nuevoSocket.on('connect', () => {
@@ -97,71 +98,83 @@ function App() {
       const mensajeError = err.message || 'Ocurrió un error desconocido.';
       setErrorEnLinea(mensajeError);
       refToast.current?.show({ severity: 'error', summary: 'Error', detail: mensajeError, life: 5000 });
-      if (mensajeError.includes("not in this room") || mensajeError.includes("Room not found") || mensajeError.includes("Sala no encontrada")) { // Añadido mensaje en español
+      if (mensajeError.includes("not in this room") || mensajeError.includes("Room not found") || mensajeError.includes("Sala no encontrada")) {
         manejarEstadoLocalSalidaSala();
       }
     });
 
-    nuevoSocket.on('joinedRoom', (data: PayloadEntradaSala) => { // 'salaUnida'
+    nuevoSocket.on('joinedRoom', (data: PayloadEntradaSala) => {
       setEnSala(true);
       setPinSala(data.pin);
       setDetallesSalaActual({
         pin: data.pin,
         limit: data.limit,
         participantsCount: data.participantsCount,
-        users: [] // Se llenará con 'actualizacionSala'
+        users: []
       });
-      setMensajes([]); // Limpiar mensajes de salas anteriores
-      setErrorEnLinea(null); // Limpiar errores en línea
+      setMensajes([]);
+      setErrorEnLinea(null);
       const mensajeUnion = data.isCreator
         ? `Has creado la sala ${data.pin}. PIN: ${data.pin}`
         : `Te has unido a la sala ${data.pin}.`;
-      setMensajes(prev => [...prev, { user: 'Sistema', text: mensajeUnion, type: 'system' }]); // 'Sistema' en vez de 'System'
+      setMensajes(prev => [...prev, { user: 'Sistema', text: mensajeUnion, type: 'system' }]);
       refToast.current?.show({ severity: 'info', summary: 'Entraste a la Sala', detail: `Has entrado a la sala ${data.pin}`, life: 3000 });
     });
 
-    nuevoSocket.on('roomUpdate', (data: PayloadActualizacionSala) => { // 'actualizacionSala'
-      setDetallesSalaActual(prev => prev ? { ...prev, participantsCount: data.participantsCount, users: data.users || [] } : null);
+    nuevoSocket.on('roomUpdate', (data: PayloadActualizacionSala) => {
+      console.log('Evento roomUpdate recibido:', data);
+      setDetallesSalaActual(prev => {
+        if (!prev) return prev;
+        const updated = { ...prev, participantsCount: data.participantsCount, users: data.users || [] };
+        console.log('Estado actualizado de detallesSalaActual:', updated);
+        return updated;
+      });
     });
 
-    nuevoSocket.on('newMessage', (message: PayloadNuevoMensaje) => { // 'nuevoMensaje'
-      // Comparar con idDispositivo directamente
-      setMensajes(prev => [...prev, { ...message, type: message.user === idDispositivo.substring(0, 6) + "..." ? 'own' : 'user' }]);
+    nuevoSocket.on('newMessage', (message: PayloadNuevoMensaje) => {
+      console.log('Nuevo mensaje recibido:', message);
+      console.log('Comparando message.user:', message.user, 'con idDispositivo:', idDispositivo.substring(0, 6) + "...");
+      const newMessage: MensajeChat = {
+        ...message,
+        type: message.user === (idDispositivo ? idDispositivo.substring(0, 6) + "..." : '') ? 'own' : 'user'
+      };
+      setMensajes(prev => [...prev, newMessage]);
     });
 
-    nuevoSocket.on('leftRoomFeedback', (data: PayloadFeedbackSalidaSala) => { // 'feedbackSalidaSala'
+    nuevoSocket.on('leftRoomFeedback', (data: PayloadFeedbackSalidaSala) => {
       manejarEstadoLocalSalidaSala();
       refToast.current?.show({ severity: 'info', summary: 'Saliste de la Sala', detail: data.message || 'Has salido de la sala.', life: 3000 });
     });
 
-    // Función de limpieza al desmontar el componente
     return () => {
       nuevoSocket.off('connect');
       nuevoSocket.off('error');
-      nuevoSocket.off('joinedRoom'); // 'salaUnida'
-      nuevoSocket.off('roomUpdate'); // 'actualizacionSala'
-      nuevoSocket.off('newMessage'); // 'nuevoMensaje'
-      nuevoSocket.off('leftRoomFeedback'); // 'feedbackSalidaSala'
+      nuevoSocket.off('joinedRoom');
+      nuevoSocket.off('roomUpdate');
+      nuevoSocket.off('newMessage');
+      nuevoSocket.off('leftRoomFeedback');
       nuevoSocket.disconnect();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Solo se ejecuta una vez al montar
+  }, [idDispositivo]); // Dependencia en idDispositivo
 
   // Efecto para auto-scroll de mensajes
   useEffect(() => {
     refFinMensajes.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensajes]);
 
-  // Restablece el estado local relacionado con estar en una sala
-  const manejarEstadoLocalSalidaSala = () => { // Anteriormente handleLocalLeaveRoomState
+  // Efecto para depurar cambios en la lista de usuarios
+  useEffect(() => {
+    console.log('Lista de usuarios actualizada:', detallesSalaActual?.users);
+  }, [detallesSalaActual?.users]);
+
+  const manejarEstadoLocalSalidaSala = () => {
     setEnSala(false);
     setPinSala('');
     setMensajes([]);
     setDetallesSalaActual(null);
   };
 
-  // Maneja la creación de una nueva sala
-  const manejarCrearSala = () => { // Anteriormente handleCreateRoom
+  const manejarCrearSala = () => {
     console.log('Llamada a manejarCrearSala');
     console.log('Socket conectado?', socket?.connected);
     console.log('Instancia de Socket:', socket);
@@ -171,7 +184,7 @@ function App() {
     if (socket && idDispositivo && limiteSalaEntrada > 0) {
       setErrorEnLinea(null);
       console.log('Emitiendo evento crearSala...');
-      socket.emit('createRoom', { limit: limiteSalaEntrada, deviceId: idDispositivo }); // 'createRoom' es el evento del backend
+      socket.emit('createRoom', { limit: limiteSalaEntrada, deviceId: idDispositivo });
     } else if (limiteSalaEntrada <= 0) {
       refToast.current?.show({ severity: 'warn', summary: 'Límite Inválido', detail: 'El límite de la sala debe ser mayor que 0.', life: 3000 });
     } else {
@@ -180,35 +193,31 @@ function App() {
     }
   };
 
-  // Maneja la unión a una sala existente
-  const manejarUnirseSala = () => { // Anteriormente handleJoinRoom
+  const manejarUnirseSala = () => {
     if (socket && pinEntrada.trim() && idDispositivo) {
       setErrorEnLinea(null);
-      socket.emit('joinRoom', { pin: pinEntrada.trim(), deviceId: idDispositivo }); // 'joinRoom' es el evento del backend
+      socket.emit('joinRoom', { pin: pinEntrada.trim(), deviceId: idDispositivo });
     } else {
       refToast.current?.show({ severity: 'warn', summary: 'Entrada Requerida', detail: 'Por favor, ingresa un PIN de sala.', life: 3000 });
     }
   };
 
-  // Maneja el envío de un nuevo mensaje
-  const manejarEnviarMensaje = (e?: React.FormEvent<HTMLFormElement>) => { // Anteriormente handleSendMessage
+  const manejarEnviarMensaje = (e?: React.FormEvent<HTMLFormElement>) => {
     e?.preventDefault();
     if (socket && entradaNuevoMensaje.trim() && pinSala && idDispositivo) {
-      socket.emit('sendMessage', { pin: pinSala, message: entradaNuevoMensaje.trim(), deviceId: idDispositivo }); // 'sendMessage' es el evento del backend
+      const user = idDispositivo.substring(0, 6) + "...";
+      socket.emit('sendMessage', { pin: pinSala, message: entradaNuevoMensaje.trim(), deviceId: idDispositivo, user });
       setEntradaNuevoMensaje('');
     }
   };
 
-  // Maneja la salida de la sala actual
-  const manejarSalirSala = () => { // Anteriormente handleLeaveRoom
+  const manejarSalirSala = () => {
     if (socket && pinSala) {
-      socket.emit('leaveRoom'); // 'leaveRoom' es el evento del backend
-      // El estado se limpiará con 'feedbackSalidaSala'
+      socket.emit('leaveRoom');
     }
   };
 
-  // Vista para cuando el usuario no está en una sala (lobby)
-  const vistaLobby = ( // Anteriormente lobbyView
+  const vistaLobby = (
     <div className="p-grid p-justify-center p-mt-5">
       <div className="p-col-12 p-md-6 p-lg-4">
         <Card title="Crear Nueva Sala" subTitle="Inicia una sesión de chat">
@@ -236,15 +245,16 @@ function App() {
     </div>
   );
 
-  // Vista para cuando el usuario está dentro de una sala de chat
-  const vistaSalaChat = ( // Anteriormente chatRoomView
+  const vistaSalaChat = (
     <div className="chat-room-container p-card p-p-3 p-d-flex p-flex-column">
-      <div className="p-d-flex p-flex-column p-sm-flex-row p-jc-between p-ai-center p-mb-3">
+      <div className="p-d-flex p-flex-column p-sm-flex-row p-jc-between p-ai-center p-mb-4">
         <h2 className="room-title p-mb-2 p-sm-mb-0">
+          <i className="pi pi-lock p-mr-2" style={{ color: '#6b46c1' }}></i>
           PIN de Sala: <span className="room-pin-highlight">{pinSala}</span>
         </h2>
         {detallesSalaActual && (
           <p className="p-m-0 participants-info">
+            <i className="pi pi-users p-mr-1"></i>
             Participantes: {detallesSalaActual.participantsCount} / {detallesSalaActual.limit}
           </p>
         )}
@@ -254,41 +264,64 @@ function App() {
         <div className="p-col-12 p-md-8 p-lg-9 p-order-2 p-md-order-1 chat-messages-section">
           <ScrollPanel
             className="messages-area p-p-2"
-            style={{ width: '100%', height: 'calc(100vh - 320px)' }} // Ajusta este valor según sea necesario
+            style={{ width: '100%', height: 'calc(100vh - 320px)' }}
           >
             {mensajes.map((msg, index) => (
               <div key={index} className={`message-bubble message-${msg.type || 'user'}`}>
-                {msg.type !== 'own' && msg.type !== 'system' && <strong className="message-user-name">{msg.user}: </strong>}
-                {msg.text}
-                {msg.timestamp && <span className="timestamp"> ({msg.timestamp})</span>}
+                {msg.type === 'system' && (
+                  <div className="p-text-center message-system">{msg.text}</div>
+                )}
+                {(msg.type === 'user' || msg.type === 'own') && (
+                  <>
+                    {msg.type === 'user' && (
+                      <div className="p-d-flex p-ai-center p-mb-1">
+                        <i className="pi pi-user p-mr-1" style={{ fontSize: '0.9rem', color: '#718096' }}></i>
+                        <strong className="message-user-name">{msg.user}</strong>
+                      </div>
+                    )}
+                    {msg.type === 'own' && (
+                      <div className="p-d-flex p-ai-center p-mb-1 p-jc-end">
+                        <span className="message-user-name p-mr-1">Tú</span>
+                        <i className="pi pi-user" style={{ fontSize: '0.9rem', color: '#e9d8fd' }}></i>
+                      </div>
+                    )}
+                    <div className={`message-content ${msg.type === 'own' ? 'message-own-content' : ''}`}>{msg.text}</div>
+                    {msg.timestamp && <span className="timestamp">{msg.timestamp}</span>}
+                  </>
+                )}
               </div>
             ))}
             <div ref={refFinMensajes} />
           </ScrollPanel>
-          <form onSubmit={manejarEnviarMensaje} className="p-d-flex p-mt-2 message-input-form">
+          <div className="p-d-flex p-mt-2 message-input-form">
             <InputText
               value={entradaNuevoMensaje}
               onChange={(e) => setEntradaNuevoMensaje(e.target.value)}
-              placeholder="Escribe un mensaje..." // Placeholder en español
+              placeholder="Escribe un mensaje..."
               className="p-mr-2 p-inputtext-lg"
               style={{ flexGrow: 1 }}
               onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); manejarEnviarMensaje(); } }}
             />
-            <Button type="submit" icon="pi pi-send" className="p-button-lg" label="Enviar" disabled={!entradaNuevoMensaje.trim()} /> {/* Label en español */}
-          </form>
+            <Button
+              icon="pi pi-send"
+              className="p-button-lg"
+              label="Enviar"
+              disabled={!entradaNuevoMensaje.trim()}
+              onClick={() => manejarEnviarMensaje()}
+            />
+          </div>
         </div>
 
         <div className="p-col-12 p-md-4 p-lg-3 p-order-1 p-md-order-2 chat-sidebar-section">
           {detallesSalaActual && detallesSalaActual.users && (
-            <Card title="Usuarios en Línea" className="p-mb-3 user-list-card"> {/* Título en español */}
-              <ScrollPanel style={{ width: '100%', maxHeight: '200px' }}>
+            <Card title={<span><i className="pi pi-users p-mr-2" />Usuarios en Línea</span>} className="p-mb-4 user-list-card">
+              <ScrollPanel style={{ width: '100%', minHeight: '150px', maxHeight: '50vh' }}>
                 <ul className="p-list-none p-p-0 p-m-0">
-                  {detallesSalaActual.users.map(nombreUsuario => ( // 'user' cambiado a 'nombreUsuario' para claridad en el map
+                  {detallesSalaActual.users.map(nombreUsuario => (
                     <li key={nombreUsuario} className="p-py-2 p-px-1 user-list-item p-d-flex p-ai-center">
-                      <i className="pi pi-user p-mr-2"></i>
+                      <i className="pi pi-circle-fill p-mr-2" style={{ color: '#48bb78', fontSize: '0.8rem' }}></i>
                       <span className="p-text-truncate" style={{ maxWidth: '150px' }}>{nombreUsuario.substring(0, 8)}...</span>
-                      {/* Comparar con idDispositivo directamente */}
-                      {nombreUsuario === idDispositivo && <span className="p-ml-auto p-tag p-tag-info p-p-1" style={{ fontSize: '0.8em' }}>Tú</span>}
+                      {nombreUsuario === idDispositivo && <span className="p-ml-auto p-tag p-tag-info p-p-1" style={{ fontSize: '0.8em', backgroundColor: '#6b46c1', color: 'white' }}>Tú</span>}
                     </li>
                   ))}
                 </ul>
@@ -296,9 +329,9 @@ function App() {
             </Card>
           )}
           <Button
-            label="Salir de Sala" // Label en español
+            label="Salir de Sala"
             icon="pi pi-sign-out"
-            className="p-button-danger p-button-lg p-mt-auto"
+            className="p-button-danger p-button-lg"
             onClick={manejarSalirSala}
             style={{ width: '100%' }}
           />
@@ -307,13 +340,12 @@ function App() {
     </div>
   );
 
-
   return (
     <div className="App p-d-flex p-flex-column p-ai-center" style={{ minHeight: '100vh' }}>
       <Toast ref={refToast} />
       <div className="p-col-12 p-lg-10 p-xl-8" style={{ width: '100%' }}>
         <div className="p-text-center p-mb-4 p-mt-3">
-          <h1 className="app-title">Chat en Tiempo Real con PrimeReact</h1> {/* Título en español */}
+          <h1 className="app-title">Chat en Tiempo Real con PrimeReact</h1>
         </div>
 
         {errorEnLinea && (
@@ -325,7 +357,7 @@ function App() {
         {!socket && (
           <div className="p-text-center p-mt-5">
             <i className="pi pi-spin pi-spinner" style={{ 'fontSize': '3em' }}></i>
-            <p>Conectando al servidor...</p> {/* Mensaje en español */}
+            <p>Conectando al servidor...</p>
           </div>
         )}
         {socket && (!enSala ? vistaLobby : vistaSalaChat)}

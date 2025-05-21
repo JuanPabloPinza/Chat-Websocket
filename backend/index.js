@@ -5,10 +5,6 @@ const cors = require('cors');
 
 const app = express();
 
-// app.use(cors({
-//     origin: "*",
-// }));
-
 app.use((req, res, next) => {
     cors({
         origin: "*",
@@ -24,14 +20,13 @@ const io = new Server(server, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"],
-        // allowedHeaders: ["my-custom-header"], // Solo si es necesario
-        // credentials: true // Solo si es necesario
     }
 });
 const PORT = process.env.PORT || 3001;
 
 let rooms = {};
 let deviceInRoom = {};
+let socketToDevice = {}; // New mapping: socket.id -> deviceId
 
 app.get('/', (req, res) => {
     res.send('El servidor de websocket está corriendo');
@@ -48,7 +43,6 @@ function generatePIN() {
 io.on('connection', (socket) => {
     console.log(`Usuario Contectado: ${socket.id}`);
     console.log(`IP: ${socket.client.conn.remoteAddress}`);
-
 
     socket.on('createRoom', ({ limit, deviceId }) => {
         if (!deviceId) {
@@ -90,6 +84,7 @@ io.on('connection', (socket) => {
         if (room.deviceIds.has(deviceId)) {
             socketInstance.join(pin);
             room.participants.add(socketInstance.id);
+            socketToDevice[socketInstance.id] = deviceId; // Map socket.id to deviceId
             socketInstance.emit('joinedRoom', {
                 pin,
                 limit: room.limit,
@@ -109,6 +104,7 @@ io.on('connection', (socket) => {
         room.participants.add(socketInstance.id);
         room.deviceIds.add(deviceId);
         deviceInRoom[deviceId] = pin;
+        socketToDevice[socketInstance.id] = deviceId; // Map socket.id to deviceId
 
         console.log(`El dispositivo con ID: ${deviceId} (Socket ${socketInstance.id}) se ha unido a la sala ${pin}. Ahora hay: ${room.participants.size}/${room.limit} participantes`);
 
@@ -129,41 +125,39 @@ io.on('connection', (socket) => {
         logicaSalas(socket, pin, deviceId);
     });
 
-    socket.on('sendMessage', ({ pin, message, deviceId }) => {
+    socket.on('sendMessage', ({ pin, message, deviceId, user }) => {
         const room = rooms[pin];
         if (room && room.participants.has(socket.id)) {
-            io.to(pin).emit('newMessage', { user: deviceId.substring(0, 6) + "...", text: message, timestamp: new Date().toLocaleTimeString() });
+            io.to(pin).emit('newMessage', { user: user || deviceId.substring(0, 6) + "...", text: message, timestamp: new Date().toLocaleTimeString() });
         } else {
             socket.emit('error', { message: 'Error, no te puedes unir o el chat con el PIN proporcionado no existe' });
         }
     });
 
     function handleLeaveRoom(socketInstance) {
-        let deviceIdToRemove = null;
-        for (const [devId, roomPin] of Object.entries(deviceInRoom)) {
-            const room = rooms[roomPin];
-            if (room && room.participants.has(socketInstance.id)) {
-                deviceIdToRemove = devId;
-                const pin = roomPin;
+        const deviceId = socketToDevice[socketInstance.id]; // Get deviceId from socket.id
+        if (!deviceId) return; // If no deviceId mapped, nothing to do
 
-                room.participants.delete(socketInstance.id);
-                room.deviceIds.delete(deviceIdToRemove);
-                delete deviceInRoom[deviceIdToRemove];
+        const roomPin = deviceInRoom[deviceId];
+        const room = rooms[roomPin];
+        if (!room) return; // If room doesn't exist, nothing to do
 
-                console.log(`El dispositivo ${deviceIdToRemove} (Socket ${socketInstance.id}) salió de el chat ${pin}. Quedan: ${room.participants.size} usuarios`);
-                socketInstance.leave(pin);
-                socketInstance.emit('leftRoomFeedback', { message: `Has salido de la sala con PIN: ${pin}` });
+        // Remove socket from participants and device from room
+        room.participants.delete(socketInstance.id);
+        room.deviceIds.delete(deviceId);
+        delete deviceInRoom[deviceId];
+        delete socketToDevice[socketInstance.id]; // Clean up mapping
 
+        console.log(`El dispositivo ${deviceId} (Socket ${socketInstance.id}) salió de la sala ${roomPin}. Quedan: ${room.participants.size} usuarios`);
+        socketInstance.leave(roomPin);
+        socketInstance.emit('leftRoomFeedback', { message: `Has salido de la sala con PIN: ${roomPin}` });
 
-                if (room.participants.size === 0) {
-                    delete rooms[pin];
-                    console.log(`La sala con el PIN: ${pin} está vacío y ha sido eliminado.`);
-                } else {
-                    io.to(pin).emit('roomUpdate', { participantsCount: room.participants.size, users: Array.from(room.deviceIds) });
-                    io.to(pin).emit('newMessage', { user: 'System', text: `El usuario ${deviceIdToRemove.substring(0, 6)} ha salido del chat.` });
-                }
-                break;
-            }
+        if (room.participants.size === 0) {
+            delete rooms[roomPin];
+            console.log(`La sala con el PIN: ${roomPin} está vacía y ha sido eliminada.`);
+        } else {
+            io.to(roomPin).emit('roomUpdate', { participantsCount: room.participants.size, users: Array.from(room.deviceIds) });
+            io.to(roomPin).emit('newMessage', { user: 'System', text: `El usuario ${deviceId.substring(0, 6)} ha salido del chat.` });
         }
     }
 
